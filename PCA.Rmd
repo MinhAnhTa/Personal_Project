@@ -1,0 +1,101 @@
+---
+title: "Lab_03"
+output: html_document
+---
+
+```{r setup, include=FALSE, eval = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(png)
+```
+## Question 1 
+**How many different types of hieroglyphics do you see?**
+First, we viewed all the unzipped images and try to figure out what is included. We found out several groups based on our personal account which are birds, parts of human body, animals, tools, coins, etc. This might not be a full classification of all the hieroglyphs because we did not have a way to document all of the signs throughout the process and the amount of times spent was not significant to go through all 4410 signs. However, we did spend time reading the articles and reference sources. We go through the book Egyptian Grammar Being an Introduction to the Study of Hieroglyphs by Sir Alan Henderson Gardinerand see that he classified them into 26 fields with the last one being others, so we cross checked with the paper and decided the amount of cluster should be from 20-30. The groups can be a wide range from maritime tools and vessels, birds, common staples, ground facilities and equipments. 
+
+- When looking at the image folder, some noticeable groups include:
++ Birds
++ Parts of human body (eyes, legs, arms, etc)
++ Animals (rabits, deers, snakes),
++ Tools (knifes, swords, axes, ropes)
++ Coins
+=> Approximately 10 groups
+However, we think that we should have better understanding of the hier... system to choose the number of clusters instead of manually guessing the number of cluster...
+So we read 40 page.... -> found ... referenced in the paper -> classify 25-27 (add more details).
+## Question 2
+**Read in all the images in R and store them as a single data frame**
+```{r}
+#files = list.files("./Hieroglyphics_Images")
+
+#hieroglyphs = lapply(files, function (x) readPNG(paste('./Hieroglyphics_Images/',x,sep = "")))
+#hieroglyphs_df <- data.frame(do.call(rbind, lapply(hieroglyphs, function(x) t(matrix(x)))))
+
+#write.csv(hieroglyphs_df, "hieroglyphs.csv")
+```
+
+```{r}
+hieroglyphs_df <- read.csv("hieroglyphs.csv")
+```
+
+## Question 3
+**First compress the data with PCA**
+```{r}
+hieroglyphs_df.pca <- prcomp(hieroglyphs_df, scale. = TRUE)
+
+pca_var = hieroglyphs_df.pca$sdev^2
+prop_varex = pca_var/sum(pca_var)
+variance_explained = cumsum(prop_varex)
+plot(variance_explained, type = 'b')
+variance_explained[554:564]
+```
+We will use 558 components as those provide more than 95% of the variance in the data. After weighing the amount of components needed to represent 95% variance of the data, we decided to go with 558 components. This amount of components has shrunk the data by 3750/558 times. It reduced the time needed for computation and retained values that are important. This is especially true because the white space in each image is quite large and we can remove them for better time usage while still have the data needed in the center for our analysis.
+
+## Question 4
+**Run some k-means clustering algorithm**
+```{r}
+hier_pca_df <- data.frame(hieroglyphs_df.pca$x)
+write.csv(hier_pca_df, "hier_pca.csv")
+
+clustering_model <- lapply(1:100, function (x) kmeans(hier_pca_df[,1:558],x,nstart=10, iter.max = 20))
+wss <- lapply(clustering_model, function(x) sum(x$tot.withinss)) 
+bss <- lapply(clustering_model, function(x) sum(x$betweenss)) 
+wss_df = data.frame(k = 1:100)
+bss_df = data.frame(k = 1:100)
+wss_df$WSS <- wss
+bss_df$BSS <- bss
+
+wss_df$WSS <- as.numeric(wss_df$WSS)
+bss_df$BSS <- as.numeric(bss_df$BSS)
+
+plot(wss_df[1:100,'k'],wss_df[1:100,'WSS'], type = 'b', xlab = 'Number of Clusters', ylab = 'Within groups sum of squares')
+plot(bss_df[1:100,'k'],bss_df[1:100,'BSS'], type = 'b', xlab = 'Number of Clusters', ylab = 'Between-cluster sum of squares')
+
+plot(wss_df[1:35,'k'],wss_df[1:35,'WSS'], type = 'b', xlab = 'Number of Clusters', ylab = 'Within groups sum of squares')
+plot(bss_df[1:35,'k'],bss_df[1:35,'BSS'], type = 'b', xlab = 'Number of Clusters', ylab = 'Between-cluster sum of squares')
+
+write.csv(wss_df, "wss.csv")
+write.csv(bss_df, "bss.csv")
+```
+After running the computation to find the within sum of squares and the between sum of squares, we decided to go with k equals to 25. This is the result that would maximize the space between each clustering while minimize the space within cluster. Beyond these range, the classification was not as significant while under it, these classification can prove significantly better. The problems that we ran into is the iter.max did not converge. This means when the number of n start was not enough for the points to converge so we have to pass another parameter which increases the iter max to 30.
+
+- Choose k = 15
+- change iter.max
+- adding between-cluster ss
+- given 25 classes of ... + 2 graphs (minimize wss, maximize bss) (describe trend in graph) => k = 15
+
+## Question 5
+**Perform the kmeans with your chosen k 1000 times, each time with 1 start**
+```{r}
+clustering_model2 <- lapply(1:1000, function (x) kmeans(hier_pca_df[,1:558],15,nstart=20, iter.max = 20))
+
+wss <- lapply(clustering_model2, function(x) sum(x$tot.withinss)) 
+wss_df_q5 = data.frame(k = 1:1000)
+wss_df_q5$WSS <- wss
+wss_df_q5$WSS <- as.numeric(wss_df_q5$WSS)
+```
+For question 5, we ran the clustering of 30 clusters 1000 times to find the optimize start to cluster. Because of the cod in R that will optimize, we find out that the larger the nstart the better it is. So we decided to go with 20 times and we got the result of wss in the range of 8320000 to 8330000 about 90% out of the repition.
+
+
+
+
+Deliverables
+For the process of working on these projects, we split the work collaborately. We worked together in the first part of the code which is reading in the data, then Minh started to read and write analysis as well as review the logic of code while Krystal implements and debug the code. Throughout the project, we came up together with the code and the logic behind each of our decisions.
